@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
         },
       });
     } catch (error) {
-      return NextResponse.json({ error: "株価の取得に失敗しました" }, { status: 500 });
+      return NextResponse.json({ error: "株価の取得に失敗しました", detail: String(error) }, { status: 500 });
     }
   }
 
