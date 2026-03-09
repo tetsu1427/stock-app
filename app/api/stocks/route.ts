@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       const quote: any = await yahooFinance.quote(symbol);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const history: any[] = await yahooFinance.historical(symbol, {
-        period1: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
+        period1: new Date(Date.now() - 400 * 24 * 60 * 60 * 1000),
         period2: new Date(),
         interval: "1d",
       });
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
         high52: quote.fiftyTwoWeekHigh,
         low52: quote.fiftyTwoWeekLow,
         currency: quote.currency,
-        history: history.slice(-30).map((h) => ({
+        history: history.map((h) => ({
           date: h.date.toISOString().split("T")[0],
           close: h.close,
           volume: h.volume,

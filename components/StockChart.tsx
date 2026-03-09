@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine } from "recharts";
 
 interface HistoryPoint { date: string; close: number; }
@@ -17,30 +18,61 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+const PERIODS = [
+  { label: "1W", days: 7 },
+  { label: "1M", days: 30 },
+  { label: "3M", days: 90 },
+  { label: "1Y", days: 365 },
+] as const;
+
+type PeriodLabel = typeof PERIODS[number]["label"];
+
 export default function StockChart({ history, currency, alertPrice }: { history: HistoryPoint[]; currency: string; alertPrice?: number }) {
+  const [period, setPeriod] = useState<PeriodLabel>("1M");
+
   if (!history?.length) return null;
 
-  const chartData = history.map((h, i) => {
-    const s5 = history.slice(Math.max(0, i - 4), i + 1).map(x => x.close);
-    const s25 = history.slice(Math.max(0, i - 24), i + 1).map(x => x.close);
+  const days = PERIODS.find(p => p.label === period)!.days;
+  const sliced = history.slice(-days);
+
+  const chartData = sliced.map((h, i) => {
+    const s5 = sliced.slice(Math.max(0, i - 4), i + 1).map(x => x.close);
+    const s25 = sliced.slice(Math.max(0, i - 24), i + 1).map(x => x.close);
     return {
-      date: h.date.slice(5),
+      date: period === "1Y" ? h.date.slice(0, 7) : h.date.slice(5),
       価格: Math.round(h.close * 100) / 100,
       MA5: Math.round(s5.reduce((a, b) => a + b, 0) / s5.length * 100) / 100,
       MA25: Math.round(s25.reduce((a, b) => a + b, 0) / s25.length * 100) / 100,
     };
   });
 
-  const prices = history.map(h => h.close);
+  const prices = sliced.map(h => h.close);
   const isUp = prices[prices.length - 1] >= prices[0];
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-2 text-[10px] text-slate-500">
-        <span>30日チャート · {currency}</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-sky-500 rounded" />MA5</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-violet-500 rounded" />MA25</span>
-        {alertPrice && <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-amber-500 rounded border-dashed" />目標</span>}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-3 text-[10px] text-slate-500">
+          <span>{currency}</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-sky-500 rounded" />MA5</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-violet-500 rounded" />MA25</span>
+          {alertPrice && <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-amber-500 rounded" />目標</span>}
+        </div>
+        <div className="flex gap-1">
+          {PERIODS.map(p => (
+            <button
+              key={p.label}
+              onClick={() => setPeriod(p.label)}
+              className={`text-[10px] px-1.5 py-0.5 rounded font-medium transition ${
+                period === p.label
+                  ? "bg-indigo-600 text-white"
+                  : "text-slate-500 hover:text-slate-300"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
       <ResponsiveContainer width="100%" height={140}>
         <LineChart data={chartData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>

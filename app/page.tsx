@@ -5,12 +5,14 @@ import StockCard from "@/components/StockCard";
 import SearchBar from "@/components/SearchBar";
 import DailyPicks from "@/components/DailyPicks";
 import Portfolio from "@/components/Portfolio";
+import MarketTicker from "@/components/MarketTicker";
+import EarningsCalendar from "@/components/EarningsCalendar";
 
 const DEFAULT_WATCHLIST = ["AAPL", "GOOGL", "7203.T", "9984.T"];
 
 export default function Home() {
   const [watchlist, setWatchlist] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<"picks" | "watchlist" | "portfolio">("picks");
+  const [activeTab, setActiveTab] = useState<"picks" | "watchlist" | "portfolio" | "earnings">("picks");
 
   useEffect(() => {
     const saved = localStorage.getItem("watchlist");
@@ -34,12 +36,14 @@ export default function Home() {
     { id: "picks", label: "今日のおすすめ", icon: "✦" },
     { id: "watchlist", label: "ウォッチリスト", icon: "◈", badge: watchlist.length },
     { id: "portfolio", label: "ポートフォリオ", icon: "◎" },
+    { id: "earnings", label: "決算", icon: "◷" },
   ] as const;
 
   return (
     <main className="min-h-screen bg-slate-950">
       {/* ヘッダー */}
       <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur-xl sticky top-0 z-30">
+        <MarketTicker />
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
@@ -102,6 +106,8 @@ export default function Home() {
         )}
 
         {activeTab === "portfolio" && <Portfolio />}
+
+        {activeTab === "earnings" && <EarningsCalendar watchlist={watchlist} />}
       </div>
 
       {/* フッター免責 */}

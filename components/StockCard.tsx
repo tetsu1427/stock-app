@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 
 const StockChart = dynamic(() => import("./StockChart"), { ssr: false });
+const NewsPanel = dynamic(() => import("./NewsPanel"), { ssr: false });
 
 interface HistoryPoint { date: string; close: number; }
 interface StockData {
@@ -188,6 +189,9 @@ export default function StockCard({ symbol, onRemove }: { symbol: string; onRemo
           {showChart && stockData.history && (
             <StockChart history={stockData.history} currency={stockData.currency} alertPrice={alertPrice ?? undefined} />
           )}
+
+          {/* ニュース */}
+          <NewsPanel symbol={symbol} />
 
           {/* AI分析 */}
           {!analysis ? (
