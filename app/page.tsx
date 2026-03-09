@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import StockCard from "@/components/StockCard";
 import SearchBar from "@/components/SearchBar";
+import DailyPicks from "@/components/DailyPicks";
 
 const DEFAULT_WATCHLIST = ["AAPL", "GOOGL", "7203.T", "9984.T"];
 
@@ -46,6 +47,9 @@ export default function Home() {
       </header>
 
       <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+        {/* 今日のおすすめ */}
+        <DailyPicks />
+
         {/* 検索バー */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">銘柄を追加</h2>
