@@ -7,12 +7,14 @@ import DailyPicks from "@/components/DailyPicks";
 import Portfolio from "@/components/Portfolio";
 import MarketTicker from "@/components/MarketTicker";
 import EarningsCalendar from "@/components/EarningsCalendar";
+import LongTermPicks from "@/components/LongTermPicks";
 
 const DEFAULT_WATCHLIST = ["AAPL", "GOOGL", "7203.T", "9984.T"];
 
 export default function Home() {
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<"picks" | "watchlist" | "portfolio" | "earnings">("picks");
+  const [picksMode, setPicksMode] = useState<"short" | "long">("short");
 
   useEffect(() => {
     const saved = localStorage.getItem("watchlist");
@@ -85,7 +87,34 @@ export default function Home() {
 
       {/* コンテンツ */}
       <div className="max-w-6xl mx-auto px-4 py-6">
-        {activeTab === "picks" && <DailyPicks />}
+        {activeTab === "picks" && (
+          <div className="space-y-6">
+            {/* 短期/長期 切替 */}
+            <div className="flex gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1 w-fit">
+              <button
+                onClick={() => setPicksMode("short")}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
+                  picksMode === "short"
+                    ? "bg-indigo-600 text-white"
+                    : "text-slate-500 hover:text-slate-300"
+                }`}
+              >
+                短期トレード
+              </button>
+              <button
+                onClick={() => setPicksMode("long")}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
+                  picksMode === "long"
+                    ? "bg-violet-600 text-white"
+                    : "text-slate-500 hover:text-slate-300"
+                }`}
+              >
+                長期保有
+              </button>
+            </div>
+            {picksMode === "short" ? <DailyPicks /> : <LongTermPicks />}
+          </div>
+        )}
 
         {activeTab === "watchlist" && (
           <div className="space-y-4">
