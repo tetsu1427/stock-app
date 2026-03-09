@@ -11,7 +11,7 @@ interface StockData {
   symbol: string; name: string; price: number; change: number;
   changePercent: number; volume: number; marketCap: number; pe: number;
   high52: number; low52: number; currency: string; history: HistoryPoint[];
-  indicators: { ma5: number; ma25: number; rsi: number };
+  indicators: { ma5: number; ma25: number; ma75: number; ma200: number; rsi: number };
 }
 interface Analysis {
   recommendation: "買い" | "様子見" | "売り"; confidence: number; summary: string;
@@ -134,18 +134,58 @@ export default function StockCard({ symbol, onRemove }: { symbol: string; onRemo
           </div>
 
           {/* 指標 */}
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { label: "RSI", value: stockData.indicators?.rsi?.toFixed(1), color: stockData.indicators?.rsi > 70 ? "text-rose-400" : stockData.indicators?.rsi < 30 ? "text-emerald-400" : "text-slate-200" },
-              { label: "MA5", value: stockData.indicators?.ma5?.toFixed(1), color: "text-slate-200" },
-              { label: "MA25", value: stockData.indicators?.ma25?.toFixed(1), color: "text-slate-200" },
-            ].map(item => (
-              <div key={item.label} className="bg-slate-800/60 rounded-xl p-2.5 text-center">
-                <p className="text-[10px] text-slate-500 uppercase tracking-wide">{item.label}</p>
-                <p className={`text-sm font-bold mt-0.5 ${item.color}`}>{item.value}</p>
-              </div>
-            ))}
-          </div>
+          {(() => {
+            const { rsi, ma5, ma25, ma75, ma200 } = stockData.indicators ?? {};
+            const price = stockData.price;
+            const dev25 = ma25 ? ((price - ma25) / ma25 * 100) : null;
+            const dev75 = ma75 ? ((price - ma75) / ma75 * 100) : null;
+            return (
+              <>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: "RSI", value: rsi?.toFixed(1), color: rsi > 70 ? "text-rose-400" : rsi < 30 ? "text-emerald-400" : "text-slate-200" },
+                    { label: "MA5", value: ma5?.toFixed(1), color: "text-slate-200" },
+                    { label: "MA25", value: ma25?.toFixed(1), color: "text-slate-200" },
+                  ].map(item => (
+                    <div key={item.label} className="bg-slate-800/60 rounded-xl p-2.5 text-center">
+                      <p className="text-[10px] text-slate-500 uppercase tracking-wide">{item.label}</p>
+                      <p className={`text-sm font-bold mt-0.5 ${item.color}`}>{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {dev25 != null && (
+                    <div className="bg-slate-800/40 rounded-xl p-2 text-center">
+                      <p className="text-[10px] text-slate-500">MA25乖離率</p>
+                      <p className={`text-xs font-bold mt-0.5 ${dev25 >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                        {dev25 >= 0 ? "+" : ""}{dev25.toFixed(2)}%
+                      </p>
+                    </div>
+                  )}
+                  {dev75 != null && (
+                    <div className="bg-slate-800/40 rounded-xl p-2 text-center">
+                      <p className="text-[10px] text-slate-500">MA75乖離率</p>
+                      <p className={`text-xs font-bold mt-0.5 ${dev75 >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                        {dev75 >= 0 ? "+" : ""}{dev75.toFixed(2)}%
+                      </p>
+                    </div>
+                  )}
+                  {ma75 != null && (
+                    <div className="bg-slate-800/40 rounded-xl p-2 text-center">
+                      <p className="text-[10px] text-slate-500">MA75</p>
+                      <p className="text-xs font-bold mt-0.5 text-slate-200">{ma75?.toFixed(1)}</p>
+                    </div>
+                  )}
+                  {ma200 != null && (
+                    <div className="bg-slate-800/40 rounded-xl p-2 text-center">
+                      <p className="text-[10px] text-slate-500">MA200</p>
+                      <p className="text-xs font-bold mt-0.5 text-slate-200">{ma200?.toFixed(1)}</p>
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
 
           <div className="grid grid-cols-2 gap-x-4 text-xs text-slate-500">
             <div className="flex justify-between"><span>52週高値</span><span className="text-slate-300 font-medium">{stockData.high52?.toLocaleString()}</span></div>

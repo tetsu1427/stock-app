@@ -68,6 +68,8 @@ export async function GET(request: NextRequest) {
         indicators: {
           ma5: ma5[ma5.length - 1],
           ma25: ma25[ma25.length - 1],
+          ma75: calculateMA(closes, 75)[closes.length - 1],
+          ma200: calculateMA(closes, 200)[closes.length - 1],
           rsi: rsi[rsi.length - 1],
         },
       });
