@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import YahooFinanceClass from "yahoo-finance2";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yahooFinance = new (YahooFinanceClass as any)();
 
@@ -52,12 +52,10 @@ async function fetchStockSummary(symbol: string) {
       ma5: calculateMA(closes, 5),
       ma25: calculateMA(closes, 25),
       rsi: calculateRSI(closes),
-      // 52週レンジでの現在位置 (0=安値圏, 100=高値圏)
       rangePosition: quote.fiftyTwoWeekHigh && quote.fiftyTwoWeekLow
         ? ((quote.regularMarketPrice - quote.fiftyTwoWeekLow) /
            (quote.fiftyTwoWeekHigh - quote.fiftyTwoWeekLow)) * 100
         : 50,
-      // 出来高比（平均比）
       volumeRatio: quote.averageDailyVolume3Month
         ? quote.regularMarketVolume / quote.averageDailyVolume3Month
         : 1,
@@ -68,12 +66,11 @@ async function fetchStockSummary(symbol: string) {
 }
 
 export async function GET() {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: "GEMINI_API_KEY が設定されていません" }, { status: 500 });
+    return NextResponse.json({ error: "GROQ_API_KEY が設定されていません" }, { status: 500 });
   }
 
-  // 全銘柄を並列取得
   const results = await Promise.all(SCAN_SYMBOLS.map(fetchStockSummary));
   const stocks = results.filter(Boolean);
 
@@ -81,53 +78,35 @@ export async function GET() {
     return NextResponse.json({ error: "株価データの取得に失敗しました" }, { status: 500 });
   }
 
-  // Gemini で分析
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+  const stocksText = stocks.map(s => `銘柄: ${s!.name} (${s!.symbol}) | 価格: ${s!.price} ${s!.currency} | 前日比: ${s!.changePercent?.toFixed(2)}% | RSI: ${s!.rsi?.toFixed(1)} | MA5: ${s!.ma5?.toFixed(1)} | MA25: ${s!.ma25?.toFixed(1)} | 52週位置: ${s!.rangePosition?.toFixed(0)}% | 出来高比: ${s!.volumeRatio?.toFixed(2)}倍 | PER: ${s!.pe?.toFixed(1) ?? "N/A"}`).join("\n");
 
-  const stocksText = stocks.map(s => `
-銘柄: ${s!.name} (${s!.symbol})
-価格: ${s!.price} ${s!.currency} | 前日比: ${s!.changePercent?.toFixed(2)}%
-RSI: ${s!.rsi?.toFixed(1)} | MA5: ${s!.ma5?.toFixed(1)} | MA25: ${s!.ma25?.toFixed(1)}
-52週レンジ内位置: ${s!.rangePosition?.toFixed(0)}% | 出来高比: ${s!.volumeRatio?.toFixed(2)}倍
-PER: ${s!.pe?.toFixed(1) ?? "N/A"}
-`.trim()).join("\n\n");
-
-  const prompt = `
-あなたは株式投資のアナリストです。本日の市場データをもとに、今日購入を検討すべき銘柄トップ3を選んでください。
+  const prompt = `あなたは株式投資のアナリストです。本日の市場データをもとに、今日購入を検討すべき銘柄トップ3を選んでください。
 
 【分析対象銘柄】
 ${stocksText}
 
 【選定基準】
-- テクニカル面: RSIが30〜60（買われすぎでない）、MA5>MA25（上昇トレンド）、または RSI<35（売られすぎからの反発期待）
+- RSIが30〜60（買われすぎでない）、MA5>MA25（上昇トレンド）、または RSI<35（売られすぎからの反発期待）
 - 出来高が平均より多い（注目度が高い）
-- 52週安値から十分距離がある（底値ではない）、または底値圏からの反発狙い
+- 52週安値から十分距離がある、または底値圏からの反発狙い
 
 以下のJSON形式のみで返してください（説明文不要）:
-{
-  "picks": [
-    {
-      "symbol": "ティッカー",
-      "name": "銘柄名",
-      "reason": "選定理由（1〜2文）",
-      "strategy": "短期" または "中期",
-      "risk": "低" または "中" または "高",
-      "confidence": 1〜100の数値
-    }
-  ],
-  "marketComment": "本日の市場全体への一言コメント（1文）"
-}
-`;
+{"picks":[{"symbol":"ティッカー","name":"銘柄名","reason":"選定理由（1〜2文）","strategy":"短期または中期","risk":"低または中または高","confidence":数値}],"marketComment":"本日の市場全体への一言コメント（1文）"}`;
 
   try {
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const groq = new Groq({ apiKey });
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3,
+      max_tokens: 1024,
+    });
+
+    const text = completion.choices[0]?.message?.content ?? "";
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("JSON parse error");
     const analysis = JSON.parse(jsonMatch[0]);
 
-    // 各ピックに株価データをマージ
     const enrichedPicks = analysis.picks.map((pick: { symbol: string }) => {
       const stockData = stocks.find(s => s!.symbol === pick.symbol);
       return { ...pick, stockData };

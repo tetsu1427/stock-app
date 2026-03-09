@@ -42,7 +42,7 @@ export default function Home() {
             <h1 className="text-xl font-bold text-gray-900">株価AIアナリスト</h1>
             <p className="text-xs text-gray-500">日本株・米国株をAIが分析・推薦</p>
           </div>
-          <span className="text-xs text-gray-400">Powered by Gemini AI</span>
+          <span className="text-xs text-gray-400">Powered by Groq AI</span>
         </div>
       </header>
 
