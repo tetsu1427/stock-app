@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 
 interface StockData {
   symbol: string;
-  name: string;
   price: number;
   changePercent: number;
   rsi: number;
@@ -30,18 +29,24 @@ interface DailyPicksData {
   updatedAt: string;
 }
 
-const riskColor = {
-  低: "text-green-600 bg-green-50 border-green-200",
-  中: "text-yellow-600 bg-yellow-50 border-yellow-200",
-  高: "text-red-600 bg-red-50 border-red-200",
+const riskBadge = {
+  低: "bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20",
+  中: "bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20",
+  高: "bg-rose-500/10 text-rose-400 ring-1 ring-rose-500/20",
 };
 
-const strategyColor = {
-  短期: "text-blue-600 bg-blue-50",
-  中期: "text-purple-600 bg-purple-50",
+const strategyBadge = {
+  短期: "bg-sky-500/10 text-sky-400 ring-1 ring-sky-500/20",
+  中期: "bg-violet-500/10 text-violet-400 ring-1 ring-violet-500/20",
 };
 
-const rankLabel = ["🥇", "🥈", "🥉"];
+const rankGradient = [
+  "from-amber-500/20 to-amber-600/5 border-amber-500/30",
+  "from-slate-400/20 to-slate-500/5 border-slate-400/30",
+  "from-orange-600/20 to-orange-700/5 border-orange-600/30",
+];
+
+const rankLabel = ["1st", "2nd", "3rd"];
 
 export default function DailyPicks() {
   const [data, setData] = useState<DailyPicksData | null>(null);
@@ -63,124 +68,113 @@ export default function DailyPicks() {
     }
   };
 
-  useEffect(() => {
-    fetchPicks();
-  }, []);
+  useEffect(() => { fetchPicks(); }, []);
 
   const updatedAt = data?.updatedAt
-    ? new Date(data.updatedAt).toLocaleString("ja-JP", {
-        month: "numeric",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
+    ? new Date(data.updatedAt).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
     : null;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-      <div className="flex items-center justify-between mb-4">
+    <div className="space-y-4">
+      {/* ヘッダー */}
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-bold text-gray-900">今日のおすすめ銘柄</h2>
+          <h2 className="text-lg font-semibold text-white">今日のおすすめ銘柄</h2>
           {data && (
-            <p className="text-xs text-gray-400 mt-0.5">
-              {data.scannedCount}銘柄をスキャン · {updatedAt} 更新
-            </p>
+            <p className="text-xs text-slate-500 mt-0.5">{data.scannedCount}銘柄をスキャン · {updatedAt} 更新</p>
           )}
         </div>
         <button
           onClick={fetchPicks}
           disabled={loading}
-          className="text-sm bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition"
+          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-sm px-4 py-2 rounded-lg transition font-medium"
         >
-          {loading ? "分析中..." : "再分析"}
+          {loading ? (
+            <><span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" /> 分析中</>
+          ) : "再分析"}
         </button>
       </div>
 
-      {loading && (
-        <div className="py-10 text-center">
-          <div className="inline-block w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-3" />
-          <p className="text-sm text-gray-500">
-            {`日米${16}銘柄をスキャンしてAIが分析中...`}
-          </p>
+      {/* マーケットコメント */}
+      {data?.marketComment && (
+        <div className="bg-indigo-950/50 border border-indigo-800/40 rounded-xl px-4 py-3 text-sm text-indigo-300">
+          <span className="text-indigo-500 font-medium mr-2">Market</span>
+          {data.marketComment}
+        </div>
+      )}
+
+      {loading && !data && (
+        <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+          <div className="w-10 h-10 border-4 border-slate-700 border-t-indigo-500 rounded-full animate-spin mb-4" />
+          <p className="text-sm">日米16銘柄をスキャン中...</p>
         </div>
       )}
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">
+        <div className="bg-rose-950/40 border border-rose-800/40 rounded-xl px-4 py-3 text-sm text-rose-400">
           {error}
         </div>
       )}
 
-      {data && !loading && (
-        <div className="space-y-3">
-          {data.marketComment && (
-            <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 text-sm text-indigo-800">
-              📊 {data.marketComment}
-            </div>
-          )}
-
+      {data && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {data.picks.map((pick, i) => (
             <div
               key={pick.symbol}
-              className="border border-gray-200 rounded-xl p-4 hover:border-indigo-300 transition"
+              className={`relative bg-gradient-to-br ${rankGradient[i]} border rounded-2xl p-5 overflow-hidden`}
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{rankLabel[i]}</span>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-gray-900">{pick.symbol}</span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          strategyColor[pick.strategy]
-                        }`}
-                      >
-                        {pick.strategy}
-                      </span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full border font-medium ${
-                          riskColor[pick.risk]
-                        }`}
-                      >
-                        リスク{pick.risk}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500">{pick.name}</p>
-                  </div>
+              {/* ランクバッジ */}
+              <div className="absolute top-4 right-4 text-xs font-bold text-slate-500 tracking-widest uppercase">
+                {rankLabel[i]}
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs text-slate-500 font-medium">{pick.name}</p>
+                  <p className="text-2xl font-bold text-white tracking-tight">{pick.symbol}</p>
                 </div>
 
                 {pick.stockData && (
-                  <div className="text-right shrink-0">
-                    <p className="font-bold text-gray-900">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-lg font-semibold text-white">
                       {pick.stockData.price?.toLocaleString()}
-                      <span className="text-xs font-normal text-gray-400 ml-1">
-                        {pick.stockData.currency}
-                      </span>
-                    </p>
-                    <p
-                      className={`text-xs font-medium ${
-                        pick.stockData.changePercent >= 0
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }`}
-                    >
-                      {pick.stockData.changePercent >= 0 ? "▲" : "▼"}
-                      {Math.abs(pick.stockData.changePercent).toFixed(2)}%
-                    </p>
+                      <span className="text-xs text-slate-400 ml-1">{pick.stockData.currency}</span>
+                    </span>
+                    <span className={`text-xs font-medium ${pick.stockData.changePercent >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                      {pick.stockData.changePercent >= 0 ? "▲" : "▼"}{Math.abs(pick.stockData.changePercent).toFixed(2)}%
+                    </span>
+                  </div>
+                )}
+
+                <p className="text-xs text-slate-300 leading-relaxed">{pick.reason}</p>
+
+                <div className="flex flex-wrap gap-1.5">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${strategyBadge[pick.strategy]}`}>
+                    {pick.strategy}
+                  </span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${riskBadge[pick.risk]}`}>
+                    リスク{pick.risk}
+                  </span>
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-slate-700/50 text-slate-400 ring-1 ring-slate-600/40">
+                    確信度 {pick.confidence}%
+                  </span>
+                </div>
+
+                {pick.stockData && (
+                  <div className="grid grid-cols-3 gap-1 pt-1">
+                    {[
+                      { label: "RSI", value: pick.stockData.rsi?.toFixed(1), alert: pick.stockData.rsi < 35 ? "text-emerald-400" : pick.stockData.rsi > 70 ? "text-rose-400" : "text-slate-300" },
+                      { label: "MA5", value: pick.stockData.ma5?.toFixed(1), alert: "text-slate-300" },
+                      { label: "MA25", value: pick.stockData.ma25?.toFixed(1), alert: "text-slate-300" },
+                    ].map((item) => (
+                      <div key={item.label} className="bg-slate-900/50 rounded-lg p-1.5 text-center">
+                        <p className="text-[10px] text-slate-500">{item.label}</p>
+                        <p className={`text-xs font-semibold ${item.alert}`}>{item.value}</p>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
-
-              <p className="text-sm text-gray-700 mt-2 leading-relaxed">{pick.reason}</p>
-
-              {pick.stockData && (
-                <div className="flex gap-3 mt-2 text-xs text-gray-500">
-                  <span>RSI: <span className={`font-medium ${pick.stockData.rsi < 35 ? "text-green-600" : pick.stockData.rsi > 70 ? "text-red-600" : "text-gray-700"}`}>{pick.stockData.rsi?.toFixed(1)}</span></span>
-                  <span>MA5: <span className="font-medium text-gray-700">{pick.stockData.ma5?.toFixed(1)}</span></span>
-                  <span>MA25: <span className="font-medium text-gray-700">{pick.stockData.ma25?.toFixed(1)}</span></span>
-                  <span className="ml-auto">確信度: <span className="font-bold text-indigo-600">{pick.confidence}%</span></span>
-                </div>
-              )}
             </div>
           ))}
         </div>

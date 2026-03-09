@@ -10,14 +10,11 @@ const DEFAULT_WATCHLIST = ["AAPL", "GOOGL", "7203.T", "9984.T"];
 
 export default function Home() {
   const [watchlist, setWatchlist] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<"picks" | "watchlist" | "portfolio">("picks");
 
   useEffect(() => {
     const saved = localStorage.getItem("watchlist");
-    if (saved) {
-      setWatchlist(JSON.parse(saved));
-    } else {
-      setWatchlist(DEFAULT_WATCHLIST);
-    }
+    setWatchlist(saved ? JSON.parse(saved) : DEFAULT_WATCHLIST);
   }, []);
 
   const saveWatchlist = (list: string[]) => {
@@ -26,75 +23,92 @@ export default function Home() {
   };
 
   const addToWatchlist = (symbol: string) => {
-    if (!watchlist.includes(symbol)) {
-      saveWatchlist([...watchlist, symbol]);
-    }
+    if (!watchlist.includes(symbol)) saveWatchlist([...watchlist, symbol]);
   };
 
   const removeFromWatchlist = (symbol: string) => {
     saveWatchlist(watchlist.filter((s) => s !== symbol));
   };
 
+  const tabs = [
+    { id: "picks", label: "今日のおすすめ", icon: "✦" },
+    { id: "watchlist", label: "ウォッチリスト", icon: "◈", badge: watchlist.length },
+    { id: "portfolio", label: "ポートフォリオ", icon: "◎" },
+  ] as const;
+
   return (
-    <main className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-20">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">株価AIアナリスト</h1>
-            <p className="text-xs text-gray-500">日本株・米国株をAIが分析・推薦</p>
+    <main className="min-h-screen bg-slate-950">
+      {/* ヘッダー */}
+      <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur-xl sticky top-0 z-30">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-sm">
+                株
+              </div>
+              <div>
+                <h1 className="text-base font-semibold text-white tracking-tight">株価AIアナリスト</h1>
+                <p className="text-xs text-slate-400">日本株・米国株</p>
+              </div>
+            </div>
+            <span className="text-xs text-slate-500 hidden sm:block">Powered by Groq / Llama</span>
           </div>
-          <span className="text-xs text-gray-400">Powered by Groq AI</span>
+
+          {/* タブ */}
+          <div className="flex gap-1 -mb-px">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === tab.id
+                    ? "border-indigo-500 text-indigo-400"
+                    : "border-transparent text-slate-500 hover:text-slate-300"
+                }`}
+              >
+                <span className="text-xs">{tab.icon}</span>
+                {tab.label}
+                {"badge" in tab && (
+                  <span className="bg-slate-700 text-slate-300 text-xs px-1.5 py-0.5 rounded-full">
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        {/* 今日のおすすめ */}
-        <DailyPicks />
+      {/* コンテンツ */}
+      <div className="max-w-6xl mx-auto px-4 py-6">
+        {activeTab === "picks" && <DailyPicks />}
 
-        {/* 検索バー */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">銘柄を追加</h2>
-          <SearchBar onAdd={addToWatchlist} watchlist={watchlist} />
-          <p className="text-xs text-gray-400 mt-2">
-            ティッカーシンボルで直接入力も可能です。日本株は末尾に .T をつけてください（例: 7203.T）
-          </p>
-        </div>
+        {activeTab === "watchlist" && (
+          <div className="space-y-4">
+            <SearchBar onAdd={addToWatchlist} watchlist={watchlist} />
+            {watchlist.length === 0 ? (
+              <div className="text-center py-16 text-slate-500">
+                <p className="text-4xl mb-3 opacity-30">◈</p>
+                <p>銘柄を検索して追加してください</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {watchlist.map((symbol) => (
+                  <StockCard key={symbol} symbol={symbol} onRemove={removeFromWatchlist} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-        {/* ポートフォリオ */}
-        <Portfolio />
+        {activeTab === "portfolio" && <Portfolio />}
+      </div>
 
-        {/* ウォッチリスト */}
-        <div>
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">
-            ウォッチリスト{" "}
-            <span className="text-gray-400 font-normal">({watchlist.length}銘柄)</span>
-          </h2>
-
-          {watchlist.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
-              <p className="text-4xl mb-2">📊</p>
-              <p>銘柄を検索して追加してください</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {watchlist.map((symbol) => (
-                <StockCard
-                  key={symbol}
-                  symbol={symbol}
-                  onRemove={removeFromWatchlist}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* 免責事項 */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-          <p className="text-xs text-yellow-800">
-            ⚠️ このアプリはAIによる情報提供を目的としており、投資アドバイスではありません。
-            投資判断はご自身の責任でお願いします。
-          </p>
-        </div>
+      {/* フッター免責 */}
+      <div className="max-w-6xl mx-auto px-4 pb-8">
+        <p className="text-xs text-slate-600 text-center">
+          ⚠️ AIによる情報提供であり、投資アドバイスではありません。投資判断はご自身の責任でお願いします。
+        </p>
       </div>
     </main>
   );

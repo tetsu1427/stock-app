@@ -5,59 +5,25 @@ import dynamic from "next/dynamic";
 
 const StockChart = dynamic(() => import("./StockChart"), { ssr: false });
 
-interface HistoryPoint {
-  date: string;
-  close: number;
-}
-
+interface HistoryPoint { date: string; close: number; }
 interface StockData {
-  symbol: string;
-  name: string;
-  price: number;
-  change: number;
-  changePercent: number;
-  volume: number;
-  marketCap: number;
-  pe: number;
-  high52: number;
-  low52: number;
-  currency: string;
-  history: HistoryPoint[];
-  indicators: {
-    ma5: number;
-    ma25: number;
-    rsi: number;
-  };
+  symbol: string; name: string; price: number; change: number;
+  changePercent: number; volume: number; marketCap: number; pe: number;
+  high52: number; low52: number; currency: string; history: HistoryPoint[];
+  indicators: { ma5: number; ma25: number; rsi: number };
 }
-
 interface Analysis {
-  recommendation: "買い" | "様子見" | "売り";
-  confidence: number;
-  summary: string;
-  positives: string[];
-  negatives: string[];
-  targetPrice: number;
-  risk: "低" | "中" | "高";
+  recommendation: "買い" | "様子見" | "売り"; confidence: number; summary: string;
+  positives: string[]; negatives: string[]; targetPrice: number; risk: "低" | "中" | "高";
 }
 
-interface StockCardProps {
-  symbol: string;
-  onRemove: (symbol: string) => void;
-}
-
-const recommendationColor = {
-  買い: "bg-green-100 text-green-800 border-green-300",
-  様子見: "bg-yellow-100 text-yellow-800 border-yellow-300",
-  売り: "bg-red-100 text-red-800 border-red-300",
+const recStyle = {
+  買い: { bg: "bg-emerald-500/10 border-emerald-500/30 text-emerald-400", dot: "bg-emerald-400" },
+  様子見: { bg: "bg-amber-500/10 border-amber-500/30 text-amber-400", dot: "bg-amber-400" },
+  売り: { bg: "bg-rose-500/10 border-rose-500/30 text-rose-400", dot: "bg-rose-400" },
 };
 
-const riskColor = {
-  低: "text-green-600",
-  中: "text-yellow-600",
-  高: "text-red-600",
-};
-
-export default function StockCard({ symbol, onRemove }: StockCardProps) {
+export default function StockCard({ symbol, onRemove }: { symbol: string; onRemove: (s: string) => void }) {
   const [stockData, setStockData] = useState<StockData | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [loading, setLoading] = useState(false);
@@ -75,162 +41,147 @@ export default function StockCard({ symbol, onRemove }: StockCardProps) {
   }, [symbol]);
 
   const saveAlert = (price: number | null) => {
-    if (price === null) {
-      localStorage.removeItem(`alert_${symbol}`);
-    } else {
-      localStorage.setItem(`alert_${symbol}`, String(price));
-    }
+    price === null ? localStorage.removeItem(`alert_${symbol}`) : localStorage.setItem(`alert_${symbol}`, String(price));
     setAlertPrice(price);
   };
 
   const fetchStock = async () => {
-    setLoading(true);
-    setError(null);
-    setAlertTriggered(false);
+    setLoading(true); setError(null); setAlertTriggered(false);
     try {
-      const res = await fetch(`/api/stocks?symbol=${symbol}`);
-      const data = await res.json();
+      const data = await fetch(`/api/stocks?symbol=${symbol}`).then(r => r.json());
       if (data.error) throw new Error(data.error);
       setStockData(data);
       if (alertPrice !== null && data.price >= alertPrice) {
         setAlertTriggered(true);
-        if ("Notification" in window && Notification.permission === "granted") {
-          new Notification(`📈 ${symbol} が目標株価に到達`, {
-            body: `現在値: ${data.price.toLocaleString()} ${data.currency}（目標: ${alertPrice.toLocaleString()}）`,
-          });
-        }
+        if ("Notification" in window && Notification.permission === "granted")
+          new Notification(`${symbol} が目標株価に到達`, { body: `現在値: ${data.price.toLocaleString()} ${data.currency}` });
       }
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { setError((e as Error).message); }
+    finally { setLoading(false); }
   };
 
   const analyzeStock = async () => {
     if (!stockData) return;
     setAnalyzing(true);
     try {
-      const res = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const data = await fetch("/api/analyze", {
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stockData }),
-      });
-      const data = await res.json();
+      }).then(r => r.json());
       if (data.error) throw new Error(data.error);
       setAnalysis(data.analysis);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setAnalyzing(false);
-    }
+    } catch (e) { setError((e as Error).message); }
+    finally { setAnalyzing(false); }
   };
 
   const setAlert = () => {
     const price = parseFloat(alertInput);
     if (!isNaN(price) && price > 0) {
-      saveAlert(price);
-      setAlertInput("");
-      setShowAlertInput(false);
-      if ("Notification" in window && Notification.permission === "default") {
-        Notification.requestPermission();
-      }
+      saveAlert(price); setAlertInput(""); setShowAlertInput(false);
+      if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
     }
   };
 
+  const isUp = stockData ? stockData.change >= 0 : true;
+
   return (
-    <div className={`bg-white rounded-xl shadow-md border p-5 transition ${alertTriggered ? "border-amber-400 ring-2 ring-amber-200" : "border-gray-200"}`}>
+    <div className={`bg-slate-900 border rounded-2xl overflow-hidden transition-all ${alertTriggered ? "border-amber-500/50 ring-1 ring-amber-500/20" : "border-slate-800 hover:border-slate-700"}`}>
       {alertTriggered && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3 text-xs text-amber-800 font-medium">
-          📈 目標株価 {alertPrice?.toLocaleString()} に到達しました！
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-xs text-amber-400 font-medium">
+          目標株価 {alertPrice?.toLocaleString()} に到達しました
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-3">
+      {/* ヘッダー */}
+      <div className="px-4 pt-4 pb-3 flex items-start justify-between">
         <div>
-          <span className="font-bold text-gray-800 text-lg">{symbol}</span>
-          {stockData && <p className="text-sm text-gray-500 mt-0.5">{stockData.name}</p>}
+          <p className="text-xs text-slate-500 font-medium">{stockData?.name || "—"}</p>
+          <p className="text-xl font-bold text-white tracking-tight">{symbol}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1.5">
           <button onClick={fetchStock} disabled={loading}
-            className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition">
-            {loading ? "取得中..." : "更新"}
+            className="text-xs bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 px-3 py-1.5 rounded-lg transition">
+            {loading ? <span className="inline-block w-3 h-3 border-2 border-slate-500 border-t-slate-300 rounded-full animate-spin" /> : "更新"}
           </button>
           <button onClick={() => onRemove(symbol)}
-            className="text-sm bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-200 transition">
-            削除
-          </button>
+            className="text-xs text-slate-500 hover:text-rose-400 px-2 py-1.5 rounded-lg hover:bg-rose-500/10 transition">✕</button>
         </div>
       </div>
 
-      {error && <p className="text-red-500 text-sm bg-red-50 rounded p-2 mb-2">{error}</p>}
+      {error && <div className="mx-4 mb-3 bg-rose-950/40 border border-rose-800/40 rounded-lg px-3 py-2 text-xs text-rose-400">{error}</div>}
 
       {!stockData && !loading && (
-        <button onClick={fetchStock}
-          className="w-full text-sm text-blue-600 border border-blue-200 rounded-lg py-2 hover:bg-blue-50 transition">
-          株価を取得する
-        </button>
+        <div className="px-4 pb-4">
+          <button onClick={fetchStock}
+            className="w-full text-sm text-indigo-400 border border-indigo-800/60 rounded-xl py-2.5 hover:bg-indigo-950/40 transition">
+            株価を取得する
+          </button>
+        </div>
       )}
 
       {stockData && (
-        <div className="space-y-3">
-          <div className="flex items-end gap-3">
-            <span className="text-3xl font-bold text-gray-900">
+        <div className="px-4 pb-4 space-y-3">
+          {/* 価格 */}
+          <div className="flex items-end gap-2">
+            <span className="text-3xl font-bold text-white tabular-nums">
               {stockData.price?.toLocaleString()}
-              <span className="text-base font-normal text-gray-500 ml-1">{stockData.currency}</span>
             </span>
-            <span className={`text-sm font-medium ${stockData.change >= 0 ? "text-green-600" : "text-red-600"}`}>
-              {stockData.change >= 0 ? "▲" : "▼"} {Math.abs(stockData.change).toFixed(2)} ({stockData.changePercent?.toFixed(2)}%)
+            <span className="text-xs text-slate-500 mb-1">{stockData.currency}</span>
+            <span className={`text-sm font-semibold ml-1 mb-0.5 ${isUp ? "text-emerald-400" : "text-rose-400"}`}>
+              {isUp ? "▲" : "▼"} {Math.abs(stockData.change).toFixed(2)} ({stockData.changePercent?.toFixed(2)}%)
             </span>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 text-xs">
-            <div className="bg-gray-50 rounded p-2"><p className="text-gray-500">MA5</p><p className="font-semibold">{stockData.indicators?.ma5?.toFixed(1)}</p></div>
-            <div className="bg-gray-50 rounded p-2"><p className="text-gray-500">MA25</p><p className="font-semibold">{stockData.indicators?.ma25?.toFixed(1)}</p></div>
-            <div className="bg-gray-50 rounded p-2"><p className="text-gray-500">RSI</p>
-              <p className={`font-semibold ${stockData.indicators?.rsi > 70 ? "text-red-600" : stockData.indicators?.rsi < 30 ? "text-green-600" : ""}`}>
-                {stockData.indicators?.rsi?.toFixed(1)}
-              </p>
-            </div>
+          {/* 指標 */}
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { label: "RSI", value: stockData.indicators?.rsi?.toFixed(1), color: stockData.indicators?.rsi > 70 ? "text-rose-400" : stockData.indicators?.rsi < 30 ? "text-emerald-400" : "text-slate-200" },
+              { label: "MA5", value: stockData.indicators?.ma5?.toFixed(1), color: "text-slate-200" },
+              { label: "MA25", value: stockData.indicators?.ma25?.toFixed(1), color: "text-slate-200" },
+            ].map(item => (
+              <div key={item.label} className="bg-slate-800/60 rounded-xl p-2.5 text-center">
+                <p className="text-[10px] text-slate-500 uppercase tracking-wide">{item.label}</p>
+                <p className={`text-sm font-bold mt-0.5 ${item.color}`}>{item.value}</p>
+              </div>
+            ))}
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
-            <div>52週高値: <span className="font-medium text-gray-800">{stockData.high52?.toLocaleString()}</span></div>
-            <div>52週安値: <span className="font-medium text-gray-800">{stockData.low52?.toLocaleString()}</span></div>
-            {stockData.pe && <div>PER: <span className="font-medium text-gray-800">{stockData.pe?.toFixed(1)}</span></div>}
-            {stockData.marketCap && <div>時価総額: <span className="font-medium text-gray-800">{(stockData.marketCap / 1e9).toFixed(1)}B</span></div>}
+          <div className="grid grid-cols-2 gap-x-4 text-xs text-slate-500">
+            <div className="flex justify-between"><span>52週高値</span><span className="text-slate-300 font-medium">{stockData.high52?.toLocaleString()}</span></div>
+            <div className="flex justify-between"><span>52週安値</span><span className="text-slate-300 font-medium">{stockData.low52?.toLocaleString()}</span></div>
+            {stockData.pe && <div className="flex justify-between"><span>PER</span><span className="text-slate-300 font-medium">{stockData.pe?.toFixed(1)}</span></div>}
+            {stockData.marketCap && <div className="flex justify-between"><span>時価総額</span><span className="text-slate-300 font-medium">{(stockData.marketCap / 1e9).toFixed(1)}B</span></div>}
           </div>
 
-          {/* アラート設定 */}
-          <div className="border-t border-gray-100 pt-2">
+          {/* アラート */}
+          <div className="border-t border-slate-800 pt-3">
             {alertPrice !== null ? (
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-amber-600">
-                  🔔 目標株価: <span className="font-bold">{alertPrice.toLocaleString()}</span>
-                  {stockData.price >= alertPrice && " ✅ 到達済み"}
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-amber-400">
+                  🔔 目標: <span className="font-bold">{alertPrice.toLocaleString()}</span>
+                  {stockData.price >= alertPrice && <span className="text-emerald-400 ml-1">✓ 到達</span>}
                 </span>
-                <button onClick={() => saveAlert(null)} className="text-gray-400 hover:text-red-500 transition">解除</button>
+                <button onClick={() => saveAlert(null)} className="text-[10px] text-slate-500 hover:text-rose-400 transition">解除</button>
               </div>
             ) : showAlertInput ? (
               <div className="flex gap-2">
                 <input type="number" value={alertInput} onChange={e => setAlertInput(e.target.value)}
-                  placeholder={`目標株価 (現在: ${stockData.price?.toLocaleString()})`}
-                  className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400"
+                  placeholder={`目標株価 (現在 ${stockData.price?.toLocaleString()})`}
+                  className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500/50 placeholder:text-slate-600"
                   onKeyDown={e => e.key === "Enter" && setAlert()} />
-                <button onClick={setAlert} className="text-xs bg-amber-500 text-white px-2 py-1 rounded hover:bg-amber-600 transition">設定</button>
-                <button onClick={() => setShowAlertInput(false)} className="text-xs text-gray-400 px-1">✕</button>
+                <button onClick={setAlert} className="text-xs bg-amber-600 hover:bg-amber-500 text-white px-2.5 py-1.5 rounded-lg transition">設定</button>
+                <button onClick={() => setShowAlertInput(false)} className="text-xs text-slate-500 hover:text-slate-300 px-1.5">✕</button>
               </div>
             ) : (
-              <button onClick={() => setShowAlertInput(true)}
-                className="text-xs text-gray-400 hover:text-amber-600 transition">
-                🔔 目標株価アラートを設定
+              <button onClick={() => setShowAlertInput(true)} className="text-xs text-slate-600 hover:text-amber-400 transition">
+                🔔 目標株価を設定
               </button>
             )}
           </div>
 
           {/* チャート */}
           <button onClick={() => setShowChart(!showChart)}
-            className="w-full text-xs text-gray-500 border border-gray-100 rounded py-1 hover:bg-gray-50 transition">
+            className="w-full text-xs text-slate-600 hover:text-slate-400 border border-slate-800 hover:border-slate-700 rounded-lg py-1.5 transition">
             {showChart ? "▲ チャートを隠す" : "▼ チャートを表示"}
           </button>
 
@@ -238,42 +189,40 @@ export default function StockCard({ symbol, onRemove }: StockCardProps) {
             <StockChart history={stockData.history} currency={stockData.currency} alertPrice={alertPrice ?? undefined} />
           )}
 
-          {!analysis && (
+          {/* AI分析 */}
+          {!analysis ? (
             <button onClick={analyzeStock} disabled={analyzing}
-              className="w-full text-sm bg-purple-600 text-white rounded-lg py-2 hover:bg-purple-700 disabled:opacity-50 transition">
-              {analyzing ? "AI分析中..." : "AIで分析する"}
+              className="w-full text-sm bg-indigo-600/90 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-xl py-2.5 transition font-medium">
+              {analyzing ? <><span className="inline-block w-3.5 h-3.5 border-2 border-indigo-300/30 border-t-white rounded-full animate-spin mr-2" />AI分析中</> : "AIで分析する"}
             </button>
-          )}
-
-          {analysis && (
-            <div className="border rounded-lg p-3 space-y-2">
+          ) : (
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3 space-y-3">
               <div className="flex items-center justify-between">
-                <span className={`text-sm font-bold px-3 py-1 rounded-full border ${recommendationColor[analysis.recommendation]}`}>
+                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${recStyle[analysis.recommendation].bg}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${recStyle[analysis.recommendation].dot}`} />
                   {analysis.recommendation}
-                </span>
-                <div className="text-xs text-gray-500">
-                  確信度: <span className="font-bold text-gray-800">{analysis.confidence}%</span>
-                  {" "}| リスク: <span className={`font-bold ${riskColor[analysis.risk]}`}>{analysis.risk}</span>
+                </div>
+                <div className="text-xs text-slate-500">
+                  確信度 <span className="text-slate-300 font-semibold">{analysis.confidence}%</span>
+                  {" · "}リスク <span className="text-slate-300 font-semibold">{analysis.risk}</span>
                 </div>
               </div>
-              <p className="text-sm text-gray-700">{analysis.summary}</p>
+              <p className="text-xs text-slate-300 leading-relaxed">{analysis.summary}</p>
               {analysis.targetPrice && (
-                <p className="text-xs text-gray-500">
-                  目標株価: <span className="font-bold text-gray-800">{analysis.targetPrice.toLocaleString()} {stockData.currency}</span>
-                </p>
+                <p className="text-xs text-slate-500">目標株価: <span className="text-slate-200 font-semibold">{analysis.targetPrice.toLocaleString()} {stockData.currency}</span></p>
               )}
-              <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
-                  <p className="font-medium text-green-700 mb-1">ポジティブ</p>
-                  {analysis.positives.map((p, i) => <p key={i} className="text-gray-600">・{p}</p>)}
+                  <p className="text-emerald-500 font-medium mb-1">+ ポジティブ</p>
+                  {analysis.positives.map((p, i) => <p key={i} className="text-slate-400 leading-relaxed">· {p}</p>)}
                 </div>
                 <div>
-                  <p className="font-medium text-red-700 mb-1">ネガティブ</p>
-                  {analysis.negatives.map((n, i) => <p key={i} className="text-gray-600">・{n}</p>)}
+                  <p className="text-rose-500 font-medium mb-1">- ネガティブ</p>
+                  {analysis.negatives.map((n, i) => <p key={i} className="text-slate-400 leading-relaxed">· {n}</p>)}
                 </div>
               </div>
               <button onClick={analyzeStock} disabled={analyzing}
-                className="w-full text-xs text-purple-600 border border-purple-200 rounded py-1 hover:bg-purple-50 transition">
+                className="w-full text-xs text-slate-500 hover:text-indigo-400 border border-slate-700 hover:border-indigo-800/60 rounded-lg py-1.5 transition">
                 再分析
               </button>
             </div>
