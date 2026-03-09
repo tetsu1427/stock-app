@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import yahooFinance from "yahoo-finance2";
+import YahooFinanceClass from "yahoo-finance2";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const yahooFinance = new (YahooFinanceClass as any)();
 
 const SCAN_SYMBOLS = [
   // 米国株

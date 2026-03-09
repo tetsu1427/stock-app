@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import yahooFinance from "yahoo-finance2";
+import YahooFinanceClass from "yahoo-finance2";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const yahooFinance = new (YahooFinanceClass as any)();
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
