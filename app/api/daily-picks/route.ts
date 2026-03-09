@@ -83,7 +83,7 @@ export async function GET() {
 
   // Gemini で分析
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
   const stocksText = stocks.map(s => `
 銘柄: ${s!.name} (${s!.symbol})
