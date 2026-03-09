@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import StockCard from "@/components/StockCard";
 import SearchBar from "@/components/SearchBar";
 import DailyPicks from "@/components/DailyPicks";
+import Portfolio from "@/components/Portfolio";
 
 const DEFAULT_WATCHLIST = ["AAPL", "GOOGL", "7203.T", "9984.T"];
 
@@ -58,6 +59,9 @@ export default function Home() {
             ティッカーシンボルで直接入力も可能です。日本株は末尾に .T をつけてください（例: 7203.T）
           </p>
         </div>
+
+        {/* ポートフォリオ */}
+        <Portfolio />
 
         {/* ウォッチリスト */}
         <div>
