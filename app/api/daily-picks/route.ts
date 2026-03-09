@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
 import YahooFinanceClass from "yahoo-finance2";
-import Groq from "groq-sdk";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yahooFinance = new (YahooFinanceClass as any)();
 
 const SCAN_SYMBOLS = [
-  // 米国株
   "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "AMD",
-  // 日本株
   "7203.T", "9984.T", "6758.T", "7974.T", "6861.T", "8306.T", "9432.T", "6902.T",
 ];
 
@@ -43,8 +40,6 @@ async function fetchStockSummary(symbol: string) {
       name: quote.longName || quote.shortName || symbol,
       price: quote.regularMarketPrice,
       changePercent: quote.regularMarketChangePercent,
-      volume: quote.regularMarketVolume,
-      avgVolume: quote.averageDailyVolume3Month,
       pe: quote.trailingPE,
       high52: quote.fiftyTwoWeekHigh,
       low52: quote.fiftyTwoWeekLow,
@@ -65,6 +60,28 @@ async function fetchStockSummary(symbol: string) {
   }
 }
 
+async function callGroq(apiKey: string, prompt: string): Promise<string> {
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3,
+      max_tokens: 1024,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Groq API error: ${res.status} ${err}`);
+  }
+  const data = await res.json();
+  return data.choices[0]?.message?.content ?? "";
+}
+
 export async function GET() {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
@@ -78,39 +95,30 @@ export async function GET() {
     return NextResponse.json({ error: "株価データの取得に失敗しました" }, { status: 500 });
   }
 
-  const stocksText = stocks.map(s => `銘柄: ${s!.name} (${s!.symbol}) | 価格: ${s!.price} ${s!.currency} | 前日比: ${s!.changePercent?.toFixed(2)}% | RSI: ${s!.rsi?.toFixed(1)} | MA5: ${s!.ma5?.toFixed(1)} | MA25: ${s!.ma25?.toFixed(1)} | 52週位置: ${s!.rangePosition?.toFixed(0)}% | 出来高比: ${s!.volumeRatio?.toFixed(2)}倍 | PER: ${s!.pe?.toFixed(1) ?? "N/A"}`).join("\n");
+  const stocksText = stocks.map(s =>
+    `${s!.symbol} (${s!.name}) | ${s!.price} ${s!.currency} | 前日比:${s!.changePercent?.toFixed(2)}% | RSI:${s!.rsi?.toFixed(1)} | MA5:${s!.ma5?.toFixed(1)} MA25:${s!.ma25?.toFixed(1)} | 52週位置:${s!.rangePosition?.toFixed(0)}% | 出来高比:${s!.volumeRatio?.toFixed(2)}倍 | PER:${s!.pe?.toFixed(1) ?? "N/A"}`
+  ).join("\n");
 
   const prompt = `あなたは株式投資のアナリストです。本日の市場データをもとに、今日購入を検討すべき銘柄トップ3を選んでください。
 
-【分析対象銘柄】
+【分析対象】
 ${stocksText}
 
-【選定基準】
-- RSIが30〜60（買われすぎでない）、MA5>MA25（上昇トレンド）、または RSI<35（売られすぎからの反発期待）
-- 出来高が平均より多い（注目度が高い）
-- 52週安値から十分距離がある、または底値圏からの反発狙い
+【選定基準】RSIが30〜60、MA5>MA25（上昇トレンド）、または RSI<35（売られすぎ反発期待）、出来高が平均より多い。
 
 以下のJSON形式のみで返してください（説明文不要）:
-{"picks":[{"symbol":"ティッカー","name":"銘柄名","reason":"選定理由（1〜2文）","strategy":"短期または中期","risk":"低または中または高","confidence":数値}],"marketComment":"本日の市場全体への一言コメント（1文）"}`;
+{"picks":[{"symbol":"ティッカー","name":"銘柄名","reason":"選定理由（1〜2文）","strategy":"短期または中期","risk":"低または中または高","confidence":数値}],"marketComment":"本日の市場全体への一言（1文）"}`;
 
   try {
-    const groq = new Groq({ apiKey });
-    const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.3,
-      max_tokens: 1024,
-    });
-
-    const text = completion.choices[0]?.message?.content ?? "";
+    const text = await callGroq(apiKey, prompt);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("JSON parse error");
     const analysis = JSON.parse(jsonMatch[0]);
 
-    const enrichedPicks = analysis.picks.map((pick: { symbol: string }) => {
-      const stockData = stocks.find(s => s!.symbol === pick.symbol);
-      return { ...pick, stockData };
-    });
+    const enrichedPicks = analysis.picks.map((pick: { symbol: string }) => ({
+      ...pick,
+      stockData: stocks.find(s => s!.symbol === pick.symbol),
+    }));
 
     return NextResponse.json({
       picks: enrichedPicks,

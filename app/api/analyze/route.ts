@@ -1,5 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import Groq from "groq-sdk";
+
+async function callGroq(apiKey: string, prompt: string): Promise<string> {
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3,
+      max_tokens: 1024,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Groq API error: ${res.status} ${err}`);
+  }
+  const data = await res.json();
+  return data.choices[0]?.message?.content ?? "";
+}
 
 export async function POST(request: NextRequest) {
   const apiKey = process.env.GROQ_API_KEY;
@@ -12,8 +33,6 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const { stockData } = body;
-
-  const groq = new Groq({ apiKey });
 
   const prompt = `あなたは株式投資のアナリストです。以下の株価データを分析し、投資判断を行ってください。
 
@@ -29,25 +48,10 @@ PER: ${stockData.pe?.toFixed(1) || "N/A"}
 RSI(14): ${stockData.indicators?.rsi?.toFixed(1) || "N/A"}
 
 以下の形式でJSON形式のみで回答してください（説明文不要）:
-{
-  "recommendation": "買い" または "様子見" または "売り",
-  "confidence": 1から100の数値（確信度）,
-  "summary": "2〜3文の投資判断サマリー",
-  "positives": ["ポジティブ要因1", "ポジティブ要因2"],
-  "negatives": ["ネガティブ要因1", "ネガティブ要因2"],
-  "targetPrice": 目標株価（数値のみ、通貨単位なし）,
-  "risk": "低" または "中" または "高"
-}`;
+{"recommendation":"買いまたは様子見または売り","confidence":数値,"summary":"2〜3文の投資判断サマリー","positives":["要因1","要因2"],"negatives":["要因1","要因2"],"targetPrice":数値,"risk":"低または中または高"}`;
 
   try {
-    const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.3,
-      max_tokens: 1024,
-    });
-
-    const text = completion.choices[0]?.message?.content ?? "";
+    const text = await callGroq(apiKey, prompt);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("JSONの解析に失敗しました");
     const analysis = JSON.parse(jsonMatch[0]);
